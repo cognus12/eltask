@@ -5,13 +5,15 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sync"
 )
 
 type Counter struct {
-	urls  []string
-	rgxp  *regexp.Regexp
-	data  map[string]int
-	total int
+	urls    []string
+	rgxp    *regexp.Regexp
+	results []string
+	total   int
+	m       sync.Mutex
 }
 
 func (c *Counter) getHtml(url string) string {
@@ -38,13 +40,22 @@ func (c *Counter) findAllSubsritngs(s string) []string {
 	return c.rgxp.FindAllString(s, -1)
 }
 
-func (c *Counter) processUrl(u string) {
-	html := c.getHtml(u)
+func (c *Counter) process(url string) {
+	html := c.getHtml(url)
 	entries := c.findAllSubsritngs(html)
 	count := len(entries)
-	c.data[u] = count
 
+	c.m.Lock()
+	c.results = append(c.results, fmt.Sprintf("Count for %v: %v", url, count))
 	c.total += count
+	c.m.Unlock()
+}
+
+func (c *Counter) print() {
+	for _, v := range c.results {
+		fmt.Println(v)
+	}
+	fmt.Println("Total: ", c.total)
 }
 
 func NewCounter(urls []string, pattern string) (*Counter, error) {
@@ -57,19 +68,42 @@ func NewCounter(urls []string, pattern string) (*Counter, error) {
 	return &Counter{
 		urls: urls,
 		rgxp: rgxp,
-		data: make(map[string]int),
 	}, nil
 }
 
 func (c *Counter) Start() {
-	for _, u := range c.urls {
-		c.processUrl(u)
-	}
-}
+	wg := sync.WaitGroup{}
 
-func (c *Counter) Print() {
-	for k, v := range c.data {
-		fmt.Printf("Count for %v: %v \n", k, v)
+	urlsCount := len(c.urls)
+
+	var workerPoolSize int
+
+	if urlsCount < 5 {
+		workerPoolSize = urlsCount
+	} else {
+		workerPoolSize = 5
 	}
-	fmt.Println("Total: ", c.total)
+
+	dataCh := make(chan string, workerPoolSize)
+
+	for i := 0; i < workerPoolSize; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			for data := range dataCh {
+				c.process(data)
+			}
+		}()
+	}
+
+	for i := range c.urls {
+		dataCh <- c.urls[i]
+	}
+
+	close(dataCh)
+
+	wg.Wait()
+	c.print()
 }
