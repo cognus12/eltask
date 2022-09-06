@@ -1,9 +1,18 @@
 package main
 
 import (
-	"fmt"
+	"eltask/pkg/counter"
+	"log"
 )
 
 func main() {
-	fmt.Println("Hello")
+	urls := []string{"https://golang.org"}
+	counter, err := counter.NewCounter(urls, `Go`)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	counter.Start()
+	counter.Print()
 }
