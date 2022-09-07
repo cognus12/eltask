@@ -22,11 +22,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	s := scrapper.NewScrapper(rgxp)
+	s := scrapper.NewScrapper()
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	s.Run(&urls, 5)
+	s.Run(&urls, rgxp, 5)
 }

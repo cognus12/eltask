@@ -1,6 +1,7 @@
 package scrapper
 
 import (
+	"eltask/pkg/pool"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,20 +9,21 @@ import (
 	"sync"
 )
 
-type Scrapper struct {
-	rgxp    *regexp.Regexp
-	results []string
-	total   int
-	m       sync.Mutex
+type scrapper struct {
+	rgxp  *regexp.Regexp
+	total int
+	m     sync.Mutex
 }
 
-func NewScrapper(rgxp *regexp.Regexp) *Scrapper {
-	return &Scrapper{
-		rgxp: rgxp,
-	}
+type Scrapper interface {
+	Run(urls *[]string, rgxp *regexp.Regexp, maxPoolSize int)
 }
 
-func (s *Scrapper) getContent(url string) string {
+func NewScrapper() Scrapper {
+	return &scrapper{}
+}
+
+func (s *scrapper) getContent(url string) string {
 	res, err := http.Get(url)
 	if err != nil {
 		fmt.Printf("error making http request: %s\n", err)
@@ -41,61 +43,33 @@ func (s *Scrapper) getContent(url string) string {
 	return string(content)
 }
 
-func (s *Scrapper) findSubsritngs(content string) []string {
+func (s *scrapper) findSubsritngs(content string) []string {
 	return s.rgxp.FindAllString(content, -1)
 }
 
-func (s *Scrapper) process(url string) {
+func (s *scrapper) write(msg string) {
+	fmt.Println(msg)
+}
+
+func (s *scrapper) parse(url string) {
 	content := s.getContent(url)
 	entries := s.findSubsritngs(content)
 	count := len(entries)
 
+	s.write(fmt.Sprintf("Count for %v: %v", url, count))
+
 	s.m.Lock()
-	s.results = append(s.results, fmt.Sprintf("Count for %v: %v", url, count))
 	s.total += count
 	s.m.Unlock()
 }
 
-func (s *Scrapper) print() {
-	for _, v := range s.results {
-		fmt.Println(v)
-	}
-	fmt.Println("Total: ", s.total)
+func (s *scrapper) clean() {
+	s.rgxp = nil
+	s.total = 0
 }
 
-func (s *Scrapper) Run(urls *[]string, maxPoolSize int) {
-	wg := sync.WaitGroup{}
-
-	urlsCount := len(*urls)
-
-	var workerPoolSize int
-
-	if urlsCount < maxPoolSize {
-		workerPoolSize = urlsCount
-	} else {
-		workerPoolSize = maxPoolSize
-	}
-
-	dataCh := make(chan string, workerPoolSize)
-
-	for i := 0; i < workerPoolSize; i++ {
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-
-			for data := range dataCh {
-				s.process(data)
-			}
-		}()
-	}
-
-	for _, u := range *urls {
-		dataCh <- u
-	}
-
-	close(dataCh)
-
-	wg.Wait()
-	s.print()
+func (s *scrapper) Run(urls *[]string, rgxp *regexp.Regexp, maxPoolSize int) {
+	s.rgxp = rgxp
+	pool.Process(urls, s.parse, maxPoolSize)
+	s.write(fmt.Sprintf("Total: %v", s.total))
 }
