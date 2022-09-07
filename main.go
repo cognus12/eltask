@@ -1,8 +1,9 @@
 package main
 
 import (
-	"eltask/pkg/counter"
+	"eltask/pkg/scrapper"
 	"log"
+	"regexp"
 )
 
 func main() {
@@ -14,11 +15,18 @@ func main() {
 		"https://gobyexample.com/atomic-counters",
 		"https://gobyexample.com/mutexes",
 	}
-	counter, err := counter.NewCounter(urls, `Go`)
+
+	rgxp, err := regexp.Compile(`Go`)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	counter.Start()
+	s := scrapper.NewScrapper(rgxp)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	s.Run(&urls, 5)
 }
