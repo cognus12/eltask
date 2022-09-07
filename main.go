@@ -24,9 +24,5 @@ func main() {
 
 	s := scrapper.NewScrapper()
 
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	s.Run(&urls, rgxp, 5)
 }
