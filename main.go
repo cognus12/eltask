@@ -3,6 +3,7 @@ package main
 import (
 	"eltask/pkg/scrapper"
 	"log"
+	"os"
 	"regexp"
 )
 
@@ -22,7 +23,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	s := scrapper.NewScrapper()
+	s := scrapper.NewScrapper(os.Stdout)
 
 	s.Run(&urls, rgxp, 5)
 }

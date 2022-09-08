@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"regexp"
 	"sync"
 )
@@ -13,14 +14,15 @@ type scrapper struct {
 	rgxp  *regexp.Regexp
 	total int
 	m     sync.Mutex
+	dst   *os.File
 }
 
 type Scrapper interface {
 	Run(urls *[]string, rgxp *regexp.Regexp, maxPoolSize int)
 }
 
-func NewScrapper() Scrapper {
-	return &scrapper{}
+func NewScrapper(dst *os.File) Scrapper {
+	return &scrapper{dst: dst}
 }
 
 func (s *scrapper) getContent(url string) string {
@@ -48,7 +50,7 @@ func (s *scrapper) findSubsritngs(content string) []string {
 }
 
 func (s *scrapper) write(msg string) {
-	fmt.Println(msg)
+	s.dst.WriteString(msg)
 }
 
 func (s *scrapper) parse(url string) {
@@ -56,7 +58,7 @@ func (s *scrapper) parse(url string) {
 	entries := s.findSubsritngs(content)
 	count := len(entries)
 
-	s.write(fmt.Sprintf("Count for %v: %v", url, count))
+	s.write(fmt.Sprintf("Count for %v: %v \n", url, count))
 
 	s.m.Lock()
 	s.total += count
